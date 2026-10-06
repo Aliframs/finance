@@ -1,0 +1,229 @@
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+const rawData = `
+100000	Kas
+100001	Kas USD
+100002	Kas Besar
+100100	Bank BRI 0509 0100 3205 300
+100101	Bank BCA 4972579789
+100102	Bank Mandiri 1640007306519
+100103	Bank BTN 0016201300012008
+100104	Bank BNI 2018665951
+110000	Piutang Usaha CV Karya Makmur
+110001	Piutang Usaha CV Sartika
+110002	Piutang Usaha CV Arkha Putra Perkasa
+110003	Piutang Usaha CV Rizka Abadi
+110004	Piutang Usaha CV Mustika Karya
+110005	Piutang Usaha CV King Arkha Perkasa
+110006	Piutang Usaha CV Dua Pilar Bersinergi
+110007	Piutang Usaha CV Bheryl Putra
+110008	Piutang Usaha CV Studio TL
+110009	Piutang Usaha CV Megah Jaya Konstruksi
+110010	Piutang Usaha CV Tugas Langit
+110011	Piutang Usaha CV Dikara Raksa
+110012	Piutang Usaha Yayasan Bumi Indonesia Raya
+110013	Piutang Usaha Yayasan Digdaya Tunas Nusantara
+110014	Piutang Usaha Yayasan Mandiri Untuk Negeri
+110015	Piutang Usaha Yayasan Keluarga Berkah Bersama
+110016	Piutang Usaha PT Agung Berlian Nusantara
+111000	Piutang Pemegang Saham PT Prima Intra Tehnology
+112000	Piutang Pajak Pph 21
+112001	Piutang Pajak PPh 26
+112002	Piutang Pajak PPh Unifikasi
+120000	Uang Muka Pembelian Barang Dagangan Modular
+120001	Uang Muka Pembelian Alat Alat Dapur
+120002	Uang Muka Pembelian Barang Dagangan Food Tray
+120003	Uang Muka Pembelian AC, Exhaust Fan
+120004	Uang Muka Pembelian Furniture
+120005	Uang Muka Pembelian Genzet
+121000	Uang Muka Pembelian Karpet
+121999	Uang Muka Pembelian Lainnya
+130000	Pembelian Barang dagangan Modular
+130001	Pembelian Alat-alat Dapur
+130002	Pembelian Barang dagangan Food Tray
+130003	Pembelian Barang dagangan AC, Exhaust Fan
+130004	Pembelian Barang dagangan Furniture
+130005	Pembelian Barang dangangan Genzet
+140000	Pembelian Karpet
+140001	Pembelian Listrik
+140002	Pembelian Material
+140003	Reimbursment / Debit Note Biaya Pelabuhan
+150000	Ongkos Pasang Modular
+150001	Ongkos Pasang AC, Exhaust Fan dan Jasa Instalasi Listrik
+150003	Jasa Custom Clearance/Dokumen
+150004	Ongkos Kirim 
+150005	Biaya Langsir, Jaga Malam, Ongkos Bongkar
+150006	Jasa Rakit Motor
+150007	Ongkos Pasang Talang Air
+150008	Jasa Instalasi Alat Dapur (PT Sankeindo)
+150009	Biaya Perbaikan Proyek
+150010	Biaya Proyek
+151000	Biaya Asuransi
+151001	Biaya Branding Motor Listrik
+160000	Biaya Dibayar Dimuka Perjalanan Dinas
+160001	Biaya Dibayar Dimuka David
+160002	Biaya Sewa dibayar Dimuka
+160003	Biaya Dibayar Dimuka PT GLORIA
+160004	Biaya Dibayar Dimuka PT PRABU
+160005	Biaya Dibayar Dimuka Notaris Michael Suyono
+170000	Pajak Dibayar Dimuka PPH22
+170001	PPN Masukan
+170002	Pajak Dibayar Dimuka PPH 25
+170003	PPN Di Bayar Dimuka 
+180000	Pinjaman Karyawan Johan Hariyanto
+180001	Pinjaman Karyawan Ari Riatna Gustika
+180002	Pinjaman Karyawan Daffa Earin Alghazali
+180003	Pinjaman Karyawan Ende Suhermawan
+181000	Piutang Biaya Operasional
+181099	Piutang Lain-lain
+190000	Aktiva Kendaraan 
+190001	Aset Tetap Inventaris Kantor
+190002	Aset Tetap Furniture
+191000	Akumulasi Penyusutan Kendaraan
+191001	Akumulasi Penyusutan Inventaris Kantor
+191002	Akumulasi Penyusutan Furniture 
+192000	Investasi PT Prima Bersama Sejahtera
+210000	Hutang Dagang Modular Wuxi Purite Import & Export Co., Ltd, China
+210001	Hutang Dagang Modular Xiamen LK Trading Co., Ltd
+210002	Hutang Dagang Pembelian Alat-alat Dapur (Tikno/PT.Sankeindo)
+210003	Hutang Dagang Pembelian Food Tray (PT Sumber Digital Media)
+210004	Hutang Dagang Pembelian Barang dagangan AC, Exhaust Fan
+210005	Hutang Dagang Pembelian Barang dagangan Furniture
+210006	Hutang Dagang Pembelian Genzet (Anekajaya Langgeng)
+210007	Hutang Dagang Ongkos Pasang Modular dan Material (Ricky/Udraji/Melisa/PT Anugrah Gabung Berdikari Utama)
+210008	Hutang Dagang Ongkos Pasang Modular dan Material Listrik (Surya/Firman Nurwegian/Ade Tatang/Maun/PT Dwicipta Surya Abadi)
+210009	Hutang Dagang PT. Gloria Mulya Jaya
+210010	Hutang Dagang Pembelian Furniture dan Ongkos Pasang PT Bintang Legenda Bola
+210011	Hutang Dagang Pembelian Alat Alat Listrik (PT. Pionir Elektrik Indonesia)
+210012	Hutang Dagang Pembelian Material & Listrik, Ongkos Kirim (CV. Pionir Elektrik Jakarta)
+210013	Hutang Dagang Forwarding PT Tera Forwarders Indonesia
+210014	Hutang Ongkos Kirim PT. Megah Surya Transportasindo
+210015	Hutang Ongkos Kirim PT. Dewenei Trans Indonesia
+210016	Hutang Dagang Ongkos Pasang Modular dan Material (Agus Budiono Kuntjoro)
+210017	Hutang Dagang PT Anugrah Sentra Persada
+210018	Hutang Dagang PT Nifra Agra Mandiri
+210019	Hutang Dagang Modular Anhui Import & Export Co., Ltd
+211000	Uang Muka Penjualan
+220000	PPN Keluaran
+220001	Hutang Pph 21 
+220002	Hutang Pph 23
+220003	Hutang PPh Final
+220004	Hutang Pembayaran PIB
+220005	Hutang PPN
+220006	Hutang Pph 29
+220007	Hutang Pajak Pph Badan
+220008	Hutang Pph 26
+230000	Hutang Pemegang Saham William Ong
+230001	Hutang Investasi
+240000	Biaya Yang Masih Harus Di Bayar Pak David
+240001	Biaya Yang Masih Harus Di Bayar PT. Mitra Pinashika Mustika Rent
+240002	Biaya Yang Masih Harus Di Bayar Air Pam
+280000	Hutang Lain Lain
+300000	Modal Usaha
+310000	Dividen
+310099	Ikhtisar Laba Rugi
+320000	Laba Di Tahan
+400000	Penjualan
+500001	HPP Alat Dapur
+500002	HPP Genzet
+500003	HPP Food Tray
+500004	HPP Jasa Instalasi Alat Dapur
+500005	HPP Modular Box
+500006	HPP Ongkos Pasang Modular
+500007	HPP Tambahan Pekerjaan Modular
+500008	HPP Pondasi Yayasan
+500009	HPP Furniture
+500010	HPP AC dan Exhaust Fan
+500011	HPP Jasa Pasang AC dan Exhaust Fan
+500012	HPP Alat Listrik
+500013	HPP Biaya Pelabuhan 
+500014	HPP Ongkos Kirim Food Tray
+500015	HPP Jasa Penarikan Kabel
+500016	HPP Ongkos Kirim 
+500017	HPP Material
+500018	HPP Biaya Langsir, Jaga Malam, Ongkos Bongkar
+500019	HPP Biaya Perbaikan Proyek
+500020	HPP Jasa Rakit Motor
+500021	HPP Karpet
+500022	HPP Ongkos Pasang Talang Air
+510101	Ongkos Angkut
+510102	Pembelian Material
+510199	Pengurusan Dokumen Kepabean
+600001	Beban Gaji
+600002	Beban Tunjangan Transport
+600003	Beban Tunjangan Tempat Tinggal
+600004	Beban Tunjangan Internet
+600005	Beban Tunjangan Perjalanan Dinas
+600006	Beban Tunjangan Makan
+600007	Beban Tunjangan Lembur
+600008	Beban Tunjangan BPJS Tenaga Kerja
+600009	Beban Asuransi Karyawan
+600010	Beban Bensin, Parkir, Toll, Kendaraan, Transportasi
+600011	Beban THR
+600012	Beban Tunjangan Entertaiment
+600013	Beban Telekomunikasi
+600014	Beban Listrik
+600015	Beban Perjalanan Dinas
+600016	Beban Perlengkapan Kantor
+600017	Beban Pajak
+600018	Beban Materai
+600019	Beban Sewa
+600020	Beban Pajak PPN BM
+600021	Beban DKPTKA 
+600022	Beban Pengiriman Dokumen
+600023	Beban Air Pam
+600025	Beban Tenaga Profesional
+600026	Beban Outsourching
+600027	Beban Tenaga Lepas (Individu)
+600028	Beban Internet
+600029	Beban Material
+600030	Beban Iuran Pemeliharaan Lingkungan
+600032	Beban Pajak Masa Kini
+600033	Beban Bunga
+600099	Entertaiment
+600100	Keperluan Dapur
+610001	Beban Penyusutan Kendaraan 
+610002	Beban Penyusutan Inventaris Kantor
+610003	Beban Penyusutan Furniture 
+710001	Pendapatan Jasa Giro
+720002	Beban Adm.Bank & Buku Cek/Giro
+720003	Pajak Jasa Giro
+720004	Selisih Kurs
+999999	Lain Lain 
+`;
+
+async function main() {
+  await prisma.masterCOA.deleteMany();
+  console.log('Cleared existing COAs.');
+
+  const lines = rawData.split('\n').filter(line => line.trim().length > 0);
+  
+  for (const line of lines) {
+    const parts = line.split('\t').map(p => p.trim());
+    if (parts.length < 2) continue;
+    
+    const accountNumber = parts[0];
+    const accountName = parts[1];
+    
+    await prisma.masterCOA.create({
+      data: {
+        accountNumber,
+        accountName,
+      }
+    });
+    console.log(`Created COA: ${accountNumber} - ${accountName}`);
+  }
+
+  console.log('Finished seeding COAs.');
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

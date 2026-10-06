@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ───────────────────────────────────────
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  password      String
+  role          String   @default("ADMIN")
+  signatureUrl  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  auditLogs     AuditLog[]
+  attachments   Attachment[]
+  poPICs        PurchaseOrder[] @relation("PO_PIC")
+  poAuditLogs   PurchaseOrderAuditLog[]
+  revisions     Revision[]
+  notifications Notification[]
+}
+
+// ─── Master Vendor / Kepada ──────────────────────
+model MasterVendor {
+  id            String   @id @default(cuid())
+  name          String
+  bankName      String
+  accountNumber String
+  accountName   String
+  address       String?
+  npwp          String?
+  nik           String?
+  createdAt     DateTime @default(now())
+
+  vouchers      Voucher[]
+  purchaseOrders PurchaseOrder[]
+}
+
+// ─── Master COA (Chart of Accounts) ──────────────
+model MasterCOA {
+  id            String   @id @default(cuid())
+  accountNumber String
+  accountName   String
+  category      String?  // e.g. "Kas & Bank", "Aset Lancar", "Beban Usaha"
+  normalBalance String   @default("DEBIT") // DEBIT or CREDIT
+  fiscalYear    String   @default("2025")
+  createdAt     DateTime @default(now())
+
+  journals         Journal[]
+  startingBalances StartingBalance[]
+  fiscalAdjustments FiscalAdjustment[]
+
+  @@unique([accountNumber, fiscalYear])
+}
+
+// ─── Starting Balance (Saldo Awal COA) ───────────
+model StartingBalance {
+  id            String   @id @default(cuid())
+  coaId         String
+  coa           MasterCOA @relation(fields: [coaId], references: [id], onDelete: Cascade)
+  fiscalYear    String   @default("2025")
+  amount        Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([coaId, fiscalYear])
+}
+
+// ─── Fiscal Adjustment (Koreksi Fiskal) ──────────
+model FiscalAdjustment {
+  id            String   @id @default(cuid())
+  coaId         String
+  coa           MasterCOA @relation(fields: [coaId], references: [id], onDelete: Cascade)
+  fiscalYear    String   @default("2025")
+  type          String   // POSITIVE or NEGATIVE
+  amount        Float    @default(0)
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── Voucher ─────────────────────────────────────
+model Voucher {
+  id              String   @id @default(cuid())
+  voucherNumber   String   @unique
+  fiscalYear      String   @default("2025")
+  date            DateTime @default(now())
+  type            String   @default("PENGELUARAN") // PENGELUARAN or PEMASUKAN
+  // Total of all item nominals
+  nominal         Float
+  
+  // Tax and Discount global calculations
+  discountPercentage  Float    @default(0)
+  ppnPercentage       Float    @default(0)
+  pphPercentage       Float    @default(0)
+  grandTotal          Float    @default(0)
+
+  vendorId        String
+  vendor          MasterVendor @relation(fields: [vendorId], references: [id])
+  bankName        String   @default("")
+  accountNumber   String   @default("")
+  accountName     String   @default("")
+
+  remarks         String?
+
+  status          String   @default("DRAFT")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           VoucherItem[]
+  journals        Journal[]
+  auditLogs       AuditLog[]
+  attachments     Attachment[]
+  revisions       Revision[]
+}
+
+// ─── Voucher Item (Detail Keterangan) ────────────
+model VoucherItem {
+  id          String   @id @default(cuid())
+  voucherId   String
+  voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  
+  description String
+  type        String   @default("BARANG") // BARANG or JASA
+  unit        String   @default("pcs")
+  qty         Int      @default(1)
+  price       Float    @default(0)
+  nominal     Float    // This is now the subtotal
+}
+
+// ─── Journal Entry ───────────────────────────────
+model Journal {
+  id            String   @id @default(cuid())
+  voucherId     String
+  voucher       Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  coaId         String
+  coa           MasterCOA @relation(fields: [coaId], references: [id])
+
+  fiscalYear    String   @default("2025")
+  description   String?
+  debit         Float    @default(0)
+  credit        Float    @default(0)
+  date          DateTime @default(now())
+  showOnVoucher Boolean  @default(true)
+  
+  syncStatus    String   @default("PENDING") // PENDING, SYNCED, FAILED
+}
+
+// ─── Attachment ──────────────────────────────────
+model Attachment {
+  id            String   @id @default(cuid())
+  voucherId     String
+  voucher       Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  uploaderId    String
+  uploader      User     @relation(fields: [uploaderId], references: [id])
+
+  originalName  String
+  filePath      String
+  uploadedAt    DateTime @default(now())
+}
+
+// ─── Audit Log ───────────────────────────────────
+model AuditLog {
+  id            String   @id @default(cuid())
+  voucherId     String
+  voucher       Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+
+  action        String   // CREATE, APPROVE, REJECT, HOLD, UPLOAD, AMENDMENT, SOFT_DELETE, NOTE
+  notes         String?
+  oldValue      String?
+  newValue      String?
+  createdAt     DateTime @default(now())
+}
+
+// ─── Purchase Order (PO) ─────────────────────────
+model PurchaseOrder {
+  id              String   @id @default(cuid())
+  poNumber        String   @unique
+  date            DateTime @default(now())
+  
+  // Tax and Discount global calculations
+  discountPercentage Float    @default(0)
+  ppnPercentage      Float    @default(0)
+  pphPercentage      Float    @default(0)
+  grandTotal         Float    @default(0)
+
+  
+  vendorId        String
+  vendor          MasterVendor @relation(fields: [vendorId], references: [id])
+  
+  remarks         String?
+  status          String   @default("DRAFT")
+
+  picId           String?
+  pic             User?    @relation("PO_PIC", fields: [picId], references: [id])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           PurchaseOrderItem[]
+  auditLogs       PurchaseOrderAuditLog[]
+}
+
+// ─── Purchase Order Item ─────────────────────────
+model PurchaseOrderItem {
+  id              String   @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  
+  description     String
+  type            String   @default("BARANG") // BARANG or JASA
+  unit            String   @default("pcs")
+  qty             Int
+  price           Float    @default(0)
+  nominal         Float    // Subtotal
+}
+
+// ─── Purchase Order Audit Log ────────────────────
+model PurchaseOrderAuditLog {
+  id              String   @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+
+  action          String   
+  notes           String?
+  oldValue        String?
+  newValue        String?
+  createdAt       DateTime @default(now())
+}
+
+// ─── Revisions ───────────────────────────────────
+model Revision {
+  id              String   @id @default(cuid())
+  voucherId       String
+  voucher         Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  
+  requestedById   String
+  requestedBy     User     @relation(fields: [requestedById], references: [id])
+  
+  type            String   // REVISI_VOUCHER or REVISI_JOURNAL
+  notes           String
+  status          String   @default("OPEN") // OPEN, RESOLVED, CANCELLED
+  
+  beforeSnapshot  String?  // JSON string
+  afterSnapshot   String?  // JSON string
+  
+  createdAt       DateTime @default(now())
+  resolvedAt      DateTime?
+}
+
+// ─── Notifications ───────────────────────────────
+model Notification {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title           String
+  message         String
+  isRead          Boolean  @default(false)
+  link            String?
+  
+  createdAt       DateTime @default(now())
+}
